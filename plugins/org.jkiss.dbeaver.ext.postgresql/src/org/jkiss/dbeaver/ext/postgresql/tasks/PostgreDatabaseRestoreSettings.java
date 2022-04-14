@@ -17,6 +17,7 @@
  */
 package org.jkiss.dbeaver.ext.postgresql.tasks;
 
+import org.jkiss.code.NotNull;
 import org.jkiss.dbeaver.DBException;
 import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.ext.postgresql.model.PostgreDatabase;
@@ -25,8 +26,12 @@ import org.jkiss.dbeaver.model.preferences.DBPPreferenceMap;
 import org.jkiss.dbeaver.model.preferences.DBPPreferenceStore;
 import org.jkiss.dbeaver.model.runtime.DBRRunnableContext;
 import org.jkiss.dbeaver.model.struct.DBSObject;
+import org.jkiss.dbeaver.tasks.nativetool.NativeToolUtils;
+import org.jkiss.dbeaver.utils.GeneralUtils;
+import org.jkiss.dbeaver.utils.RuntimeUtils;
 import org.jkiss.utils.CommonUtils;
 
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 
 public class PostgreDatabaseRestoreSettings extends PostgreBackupRestoreSettings {
@@ -39,6 +44,7 @@ public class PostgreDatabaseRestoreSettings extends PostgreBackupRestoreSettings
     private boolean createDatabase;
 
     private PostgreDatabaseRestoreInfo restoreInfo;
+    private File restoreFolder;
 
     public String getInputFile() {
         return inputFile;
@@ -84,6 +90,13 @@ public class PostgreDatabaseRestoreSettings extends PostgreBackupRestoreSettings
     public void loadSettings(DBRRunnableContext runnableContext, DBPPreferenceStore store) throws DBException {
         super.loadSettings(runnableContext, store);
 
+        if (restoreFolder == null|| !restoreFolder.exists()) {
+            log.warn("Output directory does not exists, using user home directory instead");
+            this.restoreFolder = null;
+        }
+        if (this.restoreFolder == null) {
+            this.restoreFolder = RuntimeUtils.getUserHomeDir();
+        }
         inputFile = store.getString("pg.restore.inputFile");
         cleanFirst = store.getBoolean("pg.restore.cleanFirst");
         noOwner = store.getBoolean("pg.restore.noOwner");
@@ -134,6 +147,32 @@ public class PostgreDatabaseRestoreSettings extends PostgreBackupRestoreSettings
         store.setValue("pg.restore.noOwner", noOwner);
         store.setValue("pg.restore.createDatabase", createDatabase);
         store.setValue("pg.restore.database", DBUtils.getObjectFullId(restoreInfo.getDatabase()));
+    }
+
+    public File getRestoreFolder(@NotNull PostgreDatabaseRestoreInfo info) {
+        if (restoreFolder == null) {
+            restoreFolder = new File(replaceVars(info, getOutputFolderPattern()));
+        }
+        return restoreFolder;
+    }
+
+    private String replaceVars(@NotNull PostgreDatabaseRestoreInfo info, String pattern) {
+        return GeneralUtils.replaceVariables(pattern, name -> {
+            switch (name) {
+                case NativeToolUtils.VARIABLE_DATABASE:
+                    return info.getDatabase().getName();
+                case NativeToolUtils.VARIABLE_HOST:
+                    return info.getDatabase().getDataSource().getContainer().getConnectionConfiguration().getHostName();
+                case NativeToolUtils.VARIABLE_CONN_TYPE:
+                    return info.getDatabase().getDataSource().getContainer().getConnectionConfiguration().getConnectionType().getId();
+                case NativeToolUtils.VARIABLE_TIMESTAMP:
+                    return RuntimeUtils.getCurrentTimeStamp();
+                case NativeToolUtils.VARIABLE_DATE:
+                    return RuntimeUtils.getCurrentDate();
+                default:
+                    return NativeToolUtils.replaceVariables(name);
+            }
+        });
     }
 
 }

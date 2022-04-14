@@ -52,6 +52,7 @@ public class PostgreDatabaseBackupSettings extends PostgreBackupRestoreSettings 
     private boolean noOwner;
     private boolean dropObjects;
     private boolean createDatabase;
+    private File outputFolder;
 
     @NotNull
     public List<PostgreDatabaseBackupInfo> getExportObjects() {
@@ -171,7 +172,13 @@ public class PostgreDatabaseBackupSettings extends PostgreBackupRestoreSettings 
     @Override
     public void loadSettings(DBRRunnableContext runnableContext, DBPPreferenceStore store) throws DBException {
         super.loadSettings(runnableContext, store);
-
+        if (outputFolder == null || !outputFolder.exists()) {
+            log.warn("Output directory does not exists, using user home directory instead");
+            this.outputFolder = null;
+        }
+        if (this.outputFolder == null) {
+            this.outputFolder = RuntimeUtils.getUserHomeDir();
+        }
         compression = store.getString("pg.export.compression");
         encoding = store.getString("pg.export.encoding");
         showViews = store.getBoolean("pg.export.showViews");
@@ -289,7 +296,12 @@ public class PostgreDatabaseBackupSettings extends PostgreBackupRestoreSettings 
 
     @NotNull
     public File getOutputFile(@NotNull PostgreDatabaseBackupInfo info) {
-        String outputFileName = GeneralUtils.replaceVariables(getOutputFilePattern(), name -> {
+        String outputFileName = replaceVars(info, getOutputFilePattern());
+        return new File(getOutputFolder(info), outputFileName);
+    }
+
+    private String replaceVars(@NotNull PostgreDatabaseBackupInfo info, String pattern) {
+        return GeneralUtils.replaceVariables(pattern, name -> {
             switch (name) {
                 case NativeToolUtils.VARIABLE_DATABASE:
                     return info.getDatabase().getName();
@@ -312,6 +324,14 @@ public class PostgreDatabaseBackupSettings extends PostgreBackupRestoreSettings 
                     return NativeToolUtils.replaceVariables(name);
             }
         });
-        return new File(getOutputFolder(), outputFileName);
+    }
+
+    @NotNull
+    @Override
+    public File getOutputFolder(@NotNull PostgreDatabaseBackupInfo info) {
+        if (outputFolder == null) {
+            outputFolder = new File(replaceVars(info, getOutputFolderPattern()));
+        }
+        return outputFolder;
     }
 }

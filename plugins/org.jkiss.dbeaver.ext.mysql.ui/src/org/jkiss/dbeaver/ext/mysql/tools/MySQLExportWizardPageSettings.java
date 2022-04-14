@@ -61,7 +61,7 @@ class MySQLExportWizardPageSettings extends MySQLWizardPageSettings<MySQLExportW
 
     @Override
     protected boolean determinePageCompletion() {
-        if (wizard.getSettings().getOutputFolder() == null) {
+        if (wizard.getSettings().getOutputFolderPattern() == null) {
             setErrorMessage("Output folder not configured");
             return false;
         }
@@ -117,11 +117,17 @@ class MySQLExportWizardPageSettings extends MySQLWizardPageSettings<MySQLExportW
             outputFileText,
             new SmartTextContentAdapter(),
             new StringContentProposalProvider(Arrays.stream(NativeToolUtils.ALL_VARIABLES).map(GeneralUtils::variablePattern).toArray(String[]::new)));
+        UIUtils.setContentProposalToolTip(outputFolderText, MySQLUIMessages.tools_db_export_wizard_page_settings_label_file_name_pattern_tip, NativeToolUtils.ALL_VARIABLES);
+        ContentAssistUtils.installContentProposal(
+            outputFolderText,
+            new SmartTextContentAdapter(),
+            new StringContentProposalProvider(Arrays.stream(NativeToolUtils.ALL_VARIABLES).map(GeneralUtils::variablePattern).toArray(String[]::new)));
+
 
         createExtraArgsInput(outputGroup);
 
-        if (wizard.getSettings().getOutputFolder() != null) {
-            outputFolderText.setText(wizard.getSettings().getOutputFolder().getAbsolutePath());
+        if (wizard.getSettings().getOutputFolderPattern() != null) {
+            outputFolderText.setText(wizard.getSettings().getOutputFolderPattern());
         }
 
         outputFileText.addModifyListener(e -> {
@@ -141,7 +147,7 @@ class MySQLExportWizardPageSettings extends MySQLWizardPageSettings<MySQLExportW
         MySQLExportSettings settings = wizard.getSettings();
 
         String fileName = outputFolderText.getText();
-        wizard.getSettings().setOutputFolder(CommonUtils.isEmpty(fileName) ? null : new File(fileName));
+        wizard.getSettings().setOutputFolderPattern(CommonUtils.isEmpty(fileName) ? null : fileName);
         settings.setOutputFilePattern(outputFileText.getText());
 
         switch (methodCombo.getSelectionIndex()) {
